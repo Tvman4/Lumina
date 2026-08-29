@@ -1,117 +1,71 @@
 # Lumina
 
-iPad installer page + GitHub Actions signer.
+Lumina is a static install page for iPad. People open it in Safari, install a small configuration profile, then tap **Install** on an app card.
 
-You do not need a PC. GitHub’s runners are the PC. You start the build from the GitHub website or the GitHub iOS app.
+The website is the installer. GitHub Actions only publishes the site. It does not sign binaries and it does not push apps onto the device.
 
-Lumina does **not** ship a signing certificate. KSign / ESign look “public” because those apps or their servers load an identity at runtime. A `.p12` is still a private key. This repo will **pull** files from URLs **you** set when you run the workflow. It will not hardcode someone else’s key.
+## What you get
 
----
+| Path | Role |
+| --- | --- |
+| `index.html` | Safari install UI |
+| `profile.mobileconfig` | Home-screen web clip for the page |
+| `apps/catalog.json` | App list the page renders |
+| `apps/*.ipa` | Signed IPA files you add |
+| `manifests/*.plist` | OTA manifests iPadOS reads |
+| `.github/workflows/pages.yml` | Deploys the folder to GitHub Pages |
 
-## What’s in the repo
+An older `build.yml` may still be in the tree. You do not need it to install anything.
 
-| File | What it does |
-|---|---|
-| `index.html` | Safari page on iPad. Profile button + install button. |
-| `profile.mobileconfig` | Home-screen shortcut. Not a signing cert. |
-| `.github/workflows/build.yml` | Downloads an unsigned IPA, signs it with zsign, publishes a Release, deploys Pages. |
-| `apps/input.ipa` | Optional. Drop an unsigned IPA here instead of a URL. |
-| `certs/` | Optional local files. Gitignored. |
+## How install works
 
----
+1. Safari loads the Pages URL.
+2. The user installs `profile.mobileconfig` under **Settings → General → VPN & Device Management**. That profile only pins Lumina to the home screen.
+3. The user taps **Install** on an app. The page opens an `itms-services://` link that points at that app’s manifest.
+4. iPadOS downloads the IPA listed in the manifest and offers the system install sheet.
 
-## One-time GitHub setup (phone is fine)
+The IPA must already be signed with an identity the device will accept. Lumina does not sign on tap.
 
-1. Create a new GitHub repo.
-2. Upload this folder (GitHub website → Add file → Upload, or the iOS app).
-3. Repo **Settings → Actions → General**
-   - Allow Actions
-   - Allow GitHub Actions to create and approve pull requests is irrelevant
-   - Workflow permissions: **Read and write**
-4. Repo **Settings → Pages**
-   - Source: **GitHub Actions**
-5. Optional, so you don’t type URLs every run — **Settings → Secrets and variables → Actions → Variables**:
+Use Safari. Other browsers drop the OTA prompt.
 
-| Variable | What to put |
-|---|---|
-| `IPA_URL` | Direct link to an unsigned `.ipa` |
-| `CERT_URL` | Direct link to **your** `.p12` |
-| `PROVISION_URL` | Direct link to **your** `.mobileprovision` |
-| `CERT_PASSWORD` | Password for that p12 |
+## Add an app
 
-If you would rather not leave the password in Variables, put `CERT_PASSWORD` / `P12_PASSWORD` under **Secrets** instead.
+1. Sign the IPA however you already sign.
+2. Upload the signed file to `apps/YourApp.ipa`.
+3. Copy `manifests/example.plist` to `manifests/yourapp.plist` and set `url`, `bundle-identifier`, `bundle-version`, and `title`.
+4. Append a record to `apps/catalog.json`.
+5. Push to `main`. Open the site on the iPad and tap Install.
 
-Base64 secrets also work if you already have them:
+`__PAGES_URL__` is rewritten to your real Pages origin during deploy.
 
-- `P12_BASE64`
-- `P12_PASSWORD`
-- `MOBILEPROVISION_BASE64`
+## GitHub Pages setup
 
----
+1. Create a repository and upload this project.
+2. Settings → Pages → Source: GitHub Actions.
+3. Settings → Actions → workflow permissions → Read and write.
+4. Run **Deploy Lumina Site** or push to `main`.
+5. Public URL: `https://<user>.github.io/<repo>/`.
 
-## Run a build with no PC
+Large IPAs can live on GitHub Releases. Put that asset URL in the manifest if the file is too big for Pages.
 
-1. Open the repo on your phone.
-2. **Actions → Lumina Sign & Release → Run workflow**.
-3. Fill what you didn’t store as variables:
+## Limits
 
-   - `ipa_url` — unsigned IPA
-   - `cert_url` — your p12
-   - `provision_url` — your mobileprovision
-   - `cert_password` — p12 password
-   - `app_name` / `bundle_id` if you want overrides
+- HTTPS is required for OTA.
+- The signing identity must be trusted on the iPad.
+- If Apple revokes that identity, installed apps stop launching.
+- A configuration profile cannot inject a signing certificate or silently install software.
+- This project does not include a certificate.
 
-4. Wait for the green check.
-5. The signed file lands in **Releases** as `Lumina-signed.ipa`.
-6. Pages URL looks like `https://YOURUSER.github.io/YOURREPO/`.
+## Troubleshooting
 
----
+| Symptom | Check |
+| --- | --- |
+| Install tap does nothing | Not Safari, or the manifest URL 404s |
+| Profile downloads but nothing appears | Settings → General → VPN & Device Management |
+| Untrusted Enterprise Developer | Trust the signing team in Settings |
+| App installs then immediately dies | Signing identity revoked |
+| Catalog empty | `catalog.json` missing or invalid |
 
-## Install on iPad
+## License
 
-Safari only.
-
-1. Open the Pages URL.
-2. Tap **Download Profile**.
-3. Settings → General → VPN & Device Management → Lumina → Install.
-4. Back in Safari, tap **Install IPA**.
-5. If OTA (`itms-services`) fights you, tap **Get IPA** and share the file into whatever installer you already use.
-
-The profile is a web clip. Trust for the *app* still comes from whatever identity signed the IPA. If that identity is revoked, the app dies. That’s Apple, not Lumina.
-
----
-
-## How signing resolution works
-
-First match wins:
-
-1. Workflow inputs (`cert_url`, `provision_url`, `cert_password`)
-2. Repo variables (`CERT_URL`, `PROVISION_URL`, `CERT_PASSWORD`)
-3. Repo secrets (`CERT_URL`, `PROVISION_URL`, or the `P12_BASE64` set)
-4. Files in `certs/` if you committed them (not recommended)
-
-There is no built-in fallback cert.
-
----
-
-## Common failures
-
-| What you see | Likely cause |
-|---|---|
-| `No IPA` | You didn’t pass `ipa_url` and `apps/input.ipa` isn’t in the repo |
-| `No signing files` | No URLs, no secrets, no `certs/` files |
-| zsign password error | Wrong `CERT_PASSWORD` |
-| zsign provision error | Provision doesn’t match the p12 |
-| iPad “Untrusted Developer” | You still have to trust the signing team in Settings |
-| App installs then won’t open | That identity got revoked |
-| OTA does nothing | Not Safari, or Pages / Release URL isn’t public |
-
----
-
-## What this is not
-
-- Not KSign, ESign, Feather, or GBox.
-- Not a store of leaked enterprise certs.
-- Not a way to hide a private key by calling it “public.”
-
-If you already have a p12 + provision you control, Lumina will pull them and sign on GitHub. That’s the whole product.
+Use it for apps you are allowed to distribute.
