@@ -1,0 +1,16 @@
+{
+  "apps": [
+    {
+      "id": "lumina-demo",
+      "name": "Lumina",
+      "subtitle": "Installer",
+      "version": "1.0.0",
+      "bundleId": "app.lumina.installer",
+      "size": "—",
+      "icon": "assets/icon.svg",
+      "ipa": "",
+      "manifest": "manifest.plist",
+      "accent": "#c9a46a"
+    }
+  ]
+}
