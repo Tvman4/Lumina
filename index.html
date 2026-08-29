@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#070708" />
+  <title>Lumina</title>
+  <link rel="apple-touch-icon" href="assets/icon.svg" />
+  <style>
+    :root {
+      --bg: #070708;
+      --card: rgba(22, 22, 26, 0.72);
+      --line: rgba(243, 215, 161, 0.18);
+      --gold: #f3d7a1;
+      --gold-2: #c9a46a;
+      --mute: #9a9488;
+      --text: #f6f1e8;
+      --ok: #9ad0b1;
+      --danger: #e08b7a;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, rgba(201,164,106,.16), transparent 50%),
+        radial-gradient(800px 400px at 100% 100%, rgba(90,70,40,.18), transparent 45%),
+        var(--bg);
+      color: var(--text);
+      font-family: "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    }
+    body { padding: 28px 20px 64px; }
+    .wrap { max-width: 820px; margin: 0 auto; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .brand { display: flex; gap: 14px; align-items: center; }
+    .mark {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: #111;
+      border: 1px solid var(--line);
+      display: grid; place-items: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+    }
+    .mark svg { width: 28px; height: 28px; }
+    h1 {
+      font-size: 22px; margin: 0; letter-spacing: .18em;
+      font-weight: 560; text-transform: uppercase;
+    }
+    .sub { color: var(--mute); font-size: 12px; letter-spacing: .22em; text-transform: uppercase; margin-top: 3px; }
+    .pill {
+      border: 1px solid var(--line); color: var(--gold);
+      padding: 8px 12px; border-radius: 999px; font-size: 11px;
+      letter-spacing: .16em; text-transform: uppercase;
+    }
+    .hero {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 28px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 30px 80px rgba(0,0,0,.35);
+      margin-bottom: 18px;
+    }
+    .hero h2 { margin: 0 0 8px; font-size: 34px; font-weight: 560; }
+    .hero p { margin: 0; color: var(--mute); line-height: 1.55; font-size: 15px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    button, .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 54px; border-radius: 16px; font-size: 15px; font-weight: 600;
+      letter-spacing: .02em;
+    }
+    .primary {
+      background: linear-gradient(180deg, #f3d7a1, #c9a46a);
+      color: #1a140c;
+      box-shadow: 0 10px 30px rgba(201,164,106,.25);
+    }
+    .ghost {
+      background: transparent; color: var(--gold);
+      border: 1px solid var(--line);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px;
+      display: flex; gap: 14px; align-items: center;
+      margin-bottom: 12px;
+    }
+    .icon {
+      width: 64px; height: 64px; border-radius: 16px; flex: none;
+      background: #101012; border: 1px solid var(--line);
+      display: grid; place-items: center; overflow: hidden;
+    }
+    .icon img, .icon svg { width: 64px; height: 64px; }
+    .meta { flex: 1; min-width: 0; }
+    .meta h3 { margin: 0; font-size: 18px; font-weight: 600; }
+    .meta span { color: var(--mute); font-size: 13px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tiny {
+      height: 42px; padding: 0 14px; border-radius: 12px; font-size: 13px;
+    }
+    .steps {
+      margin-top: 22px; display: grid; gap: 10px;
+    }
+    .step {
+      display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start;
+      color: var(--mute); font-size: 14px; line-height: 1.45;
+    }
+    .n {
+      width: 36px; height: 36px; border-radius: 12px;
+      border: 1px solid var(--line); display: grid; place-items: center;
+      color: var(--gold); font-size: 12px; letter-spacing: .08em;
+    }
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: #161618; border: 1px solid var(--line); color: var(--text);
+      padding: 12px 16px; border-radius: 14px; font-size: 13px;
+      opacity: 0; pointer-events: none; transition: .25s ease;
+      max-width: calc(100% - 32px);
+    }
+    .toast.on { opacity: 1; }
+    footer { margin-top: 28px; color: var(--mute); font-size: 12px; letter-spacing: .08em; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="mark">
+          <svg viewBox="0 0 256 256" fill="none"><circle cx="128" cy="128" r="78" stroke="#f3d7a1" stroke-width="10"/><circle cx="128" cy="128" r="16" fill="#f3d7a1"/><path d="M128 50 L128 86" stroke="#f3d7a1" stroke-width="8" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <h1>Lumina</h1>
+          <div class="sub">Quiet install layer</div>
+        </div>
+      </div>
+      <div class="pill" id="statusPill">Ready</div>
+    </header>
+
+    <section class="hero">
+      <h2>Install in two taps.</h2>
+      <p>Download the profile first. After GitHub Actions signs an IPA with <em>your</em> certificate secrets, this page can pull the build and hand it to iPadOS.</p>
+      <div class="row">
+        <a class="btn primary" id="profileBtn" href="profile.mobileconfig">Download Profile</a>
+        <button class="ghost" id="installBtn" type="button">Install IPA</button>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="n">01</div><div>Safari only. Chrome / in-app browsers will fight you on profile + OTA install.</div></div>
+        <div class="step"><div class="n">02</div><div>Settings → General → VPN &amp; Device Management → install the Lumina profile. That is a home-screen clip, not a stolen cert.</div></div>
+        <div class="step"><div class="n">03</div><div>Add <code>P12_BASE64</code>, <code>P12_PASSWORD</code>, <code>MOBILEPROVISION_BASE64</code> as repo secrets, drop an unsigned IPA, run the workflow.</div></div>
+      </div>
+    </section>
+
+    <article class="card" id="appCard">
+      <div class="icon"><img src="assets/icon.svg" alt="" /></div>
+      <div class="meta">
+        <h3 id="appName">Lumina</h3>
+        <span id="appMeta">Waiting for a signed release</span>
+      </div>
+      <div class="actions">
+        <a class="btn ghost tiny" id="dlIpa" href="__IPA_URL__">Get IPA</a>
+        <button class="primary tiny" id="otaBtn" type="button">OTA</button>
+      </div>
+    </article>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const IPA = "__IPA_URL__";
+    const MANIFEST = "__MANIFEST_URL__";
+
+    const toast = (msg) => {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("on");
+      setTimeout(() => el.classList.remove("on"), 2600);
+    };
+
+    const ready = IPA && !IPA.includes("__IPA");
+    document.getElementById("statusPill").textContent = ready ? "Signed build" : "Needs workflow";
+    document.getElementById("appMeta").textContent = ready
+      ? "Signed artifact from GitHub Releases"
+      : "Run Lumina Sign & Release first";
+
+    document.getElementById("installBtn").addEventListener("click", () => {
+      if (!ready) {
+        toast("No signed IPA yet. Run the GitHub Action.");
+        return;
+      }
+      const url = "itms-services://?action=download-manifest&url=" + encodeURIComponent(MANIFEST);
+      window.location.href = url;
+    });
+
+    document.getElementById("otaBtn").addEventListener("click", () => {
+      document.getElementById("installBtn").click();
+    });
+
+    document.getElementById("profileBtn").addEventListener("click", () => {
+      toast("Allow the profile download, then install it in Settings.");
+    });
+
+    fetch("catalog.json").then(r => r.ok ? r.json() : null).then(data => {
+      if (!data || !data.apps || !data.apps[0]) return;
+      const app = data.apps[0];
+      document.getElementById("appName").textContent = app.name;
+    }).catch(() => {});
+  </script>
+</body>
+</html>

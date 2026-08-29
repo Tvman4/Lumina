@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      <key>IgnoreManifestScope</key>
+      <true/>
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>Lumina</string>
+      <key>PayloadDescription</key>
+      <string>Adds a Lumina home-screen web clip so you can open the installer in one tap.</string>
+      <key>PayloadDisplayName</key>
+      <string>Lumina Web Clip</string>
+      <key>PayloadIdentifier</key>
+      <string>app.lumina.installer.webclip</string>
+      <key>PayloadType</key>
+      <string>com.apple.webClip.managed</string>
+      <key>PayloadUUID</key>
+      <string>A3C1E9B2-7F44-4D1A-9C08-6E2B91F04C11</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>Precomposed</key>
+      <true/>
+      <key>URL</key>
+      <string>__PAGES_URL__</string>
+    </dict>
+  </array>
+  <key>PayloadDescription</key>
+  <string>Lumina helper profile. This only adds a home-screen shortcut to the installer page. It does not contain a signing certificate. Trust / signing still comes from the provision you sign with in GitHub Actions.</string>
+  <key>PayloadDisplayName</key>
+  <string>Lumina</string>
+  <key>PayloadIdentifier</key>
+  <string>app.lumina.installer.profile</string>
+  <key>PayloadOrganization</key>
+  <string>Lumina</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>0F6B2D91-4A88-4C3E-B017-9D55E2A81B70</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>
