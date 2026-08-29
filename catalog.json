@@ -1,0 +1,20 @@
+{
+  "site": {
+    "name": "Lumina",
+    "tagline": "Install on device. Not in Actions."
+  },
+  "apps": [
+    {
+      "id": "example",
+      "name": "Example App",
+      "subtitle": "Replace this entry",
+      "version": "1.0.0",
+      "bundleId": "app.example.bundle",
+      "size": "—",
+      "icon": "assets/icon.svg",
+      "ipa": "apps/example.ipa",
+      "manifest": "manifests/example.plist",
+      "accent": "#c9a46a"
+    }
+  ]
+}
