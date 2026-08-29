@@ -1,1 +1,258 @@
+name: Lumina Sign & Release
 
+# Runs on GitHub's machines. You do not need a PC.
+# Phone / iPad browser can start this workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: "Direct URL to an unsigned .ipa"
+        required: false
+        default: ""
+      cert_url:
+        description: "Direct URL to a .p12 (your file). Leave blank to use repo vars/secrets."
+        required: false
+        default: ""
+      provision_url:
+        description: "Direct URL to a .mobileprovision (your file)."
+        required: false
+        default: ""
+      cert_password:
+        description: "Password for that .p12"
+        required: false
+        default: ""
+      bundle_id:
+        description: "Bundle id override (blank = keep original)"
+        required: false
+        default: ""
+      app_name:
+        description: "Display name"
+        required: false
+        default: "Lumina"
+      release_tag:
+        description: "Release tag"
+        required: false
+        default: "latest"
+  push:
+    paths:
+      - "apps/input.ipa"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prep workspace
+        run: |
+          mkdir -p signed work certs_runtime
+          echo "LUMINA_NAME=${{ github.event.inputs.app_name || 'Lumina' }}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=${{ github.event.inputs.release_tag || 'latest' }}" >> "$GITHUB_ENV"
+
+      - name: Fetch unsigned IPA
+        run: |
+          set -euo pipefail
+          INPUT_URL="${{ github.event.inputs.ipa_url }}"
+          if [ -z "$INPUT_URL" ]; then INPUT_URL="${{ vars.IPA_URL }}"; fi
+          if [ -n "$INPUT_URL" ]; then
+            curl -L --fail --retry 3 -A "Lumina/1.0" -o work/input.ipa "$INPUT_URL"
+          elif [ -f apps/input.ipa ]; then
+            cp apps/input.ipa work/input.ipa
+          else
+            echo "::error::No IPA. Pass ipa_url when you run the workflow, set repo variable IPA_URL, or commit apps/input.ipa"
+            exit 1
+          fi
+          file work/input.ipa
+          ls -lh work/input.ipa
+
+      - name: Materialize signing identity
+        env:
+          IN_CERT_URL: ${{ github.event.inputs.cert_url }}
+          IN_PROV_URL: ${{ github.event.inputs.provision_url }}
+          IN_PASS: ${{ github.event.inputs.cert_password }}
+          VAR_CERT_URL: ${{ vars.CERT_URL }}
+          VAR_PROV_URL: ${{ vars.PROVISION_URL }}
+          VAR_PASS: ${{ vars.CERT_PASSWORD }}
+          P12_BASE64: ${{ secrets.P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          MOBILEPROVISION_BASE64: ${{ secrets.MOBILEPROVISION_BASE64 }}
+          SECRET_CERT_URL: ${{ secrets.CERT_URL }}
+          SECRET_PROV_URL: ${{ secrets.PROVISION_URL }}
+        run: |
+          set -euo pipefail
+
+          CERT_URL="${IN_CERT_URL:-}"
+          PROV_URL="${IN_PROV_URL:-}"
+          PASS="${IN_PASS:-}"
+
+          [ -z "$CERT_URL" ] && CERT_URL="${VAR_CERT_URL:-}"
+          [ -z "$PROV_URL" ] && PROV_URL="${VAR_PROV_URL:-}"
+          [ -z "$PASS" ] && PASS="${VAR_PASS:-}"
+
+          [ -z "$CERT_URL" ] && CERT_URL="${SECRET_CERT_URL:-}"
+          [ -z "$PROV_URL" ] && PROV_URL="${SECRET_PROV_URL:-}"
+          [ -z "$PASS" ] && PASS="${P12_PASSWORD:-}"
+
+          if [ -n "$CERT_URL" ] && [ -n "$PROV_URL" ]; then
+            echo "Pulling signing files from the URLs you configured."
+            curl -L --fail --retry 3 -A "Lumina/1.0" -o certs_runtime/certificate.p12 "$CERT_URL"
+            curl -L --fail --retry 3 -A "Lumina/1.0" -o certs_runtime/embed.mobileprovision "$PROV_URL"
+            printf '%s' "$PASS" > certs_runtime/password.txt
+          elif [ -n "${P12_BASE64:-}" ] && [ -n "${MOBILEPROVISION_BASE64:-}" ]; then
+            echo "Using base64 secrets."
+            echo "$P12_BASE64" | base64 -d > certs_runtime/certificate.p12
+            echo "$MOBILEPROVISION_BASE64" | base64 -d > certs_runtime/embed.mobileprovision
+            printf '%s' "${P12_PASSWORD:-}" > certs_runtime/password.txt
+          elif [ -f certs/certificate.p12 ] && [ -f certs/embed.mobileprovision ]; then
+            echo "Using files from certs/ in the repo."
+            cp certs/certificate.p12 certs_runtime/certificate.p12
+            cp certs/embed.mobileprovision certs_runtime/embed.mobileprovision
+            if [ -f certs/password.txt ]; then
+              cp certs/password.txt certs_runtime/password.txt
+            else
+              printf '%s' "$PASS" > certs_runtime/password.txt
+            fi
+          else
+            echo "::error::No signing files."
+            echo "Set workflow inputs cert_url + provision_url,"
+            echo "or repo variables CERT_URL + PROVISION_URL + CERT_PASSWORD,"
+            echo "or secrets P12_BASE64 + MOBILEPROVISION_BASE64 + P12_PASSWORD."
+            echo "Lumina does not ship a built-in certificate."
+            exit 1
+          fi
+
+          python3 - << 'PY'
+          from pathlib import Path
+          p12 = Path("certs_runtime/certificate.p12").read_bytes()
+          prov = Path("certs_runtime/embed.mobileprovision").read_bytes()
+          if len(p12) < 64:
+              raise SystemExit("certificate.p12 looks empty")
+          if b"Buffer" in p12[:200] and b"plist" not in p12[:200] and p12[:2] != b"\x30\x82":
+              # still allow; some hosts wrap files
+              pass
+          print(f"p12 bytes={len(p12)} provision bytes={len(prov)}")
+          PY
+
+      - name: Install zsign
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y git cmake g++ zip unzip libssl-dev zlib1g-dev pkg-config
+          git clone --depth 1 https://github.com/zhlynn/zsign.git work/zsign-src
+          cmake -S work/zsign-src -B work/zsign-src/build
+          cmake --build work/zsign-src/build -j"$(nproc)"
+          sudo cp work/zsign-src/build/zsign /usr/local/bin/zsign
+          command -v zsign
+
+      - name: Sign IPA
+        run: |
+          set -euo pipefail
+          PASS="$(cat certs_runtime/password.txt || true)"
+          EXTRA=()
+          if [ -n "${{ github.event.inputs.bundle_id }}" ]; then
+            EXTRA+=(-b "${{ github.event.inputs.bundle_id }}")
+          fi
+          if [ -n "${{ github.event.inputs.app_name }}" ]; then
+            EXTRA+=(-n "${{ github.event.inputs.app_name }}")
+          fi
+          zsign \
+            -k certs_runtime/certificate.p12 \
+            -p "$PASS" \
+            -m certs_runtime/embed.mobileprovision \
+            "${EXTRA[@]}" \
+            -o signed/Lumina-signed.ipa \
+            work/input.ipa
+          ls -lh signed/Lumina-signed.ipa
+
+      - name: Build OTA manifest
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import os, plistlib, hashlib, pathlib
+          ipa = pathlib.Path("signed/Lumina-signed.ipa")
+          raw = ipa.read_bytes()
+          sha = hashlib.sha256(raw).hexdigest()
+          size = ipa.stat().st_size
+          repo = os.environ.get("GITHUB_REPOSITORY", "user/lumina")
+          tag = os.environ.get("RELEASE_TAG", "latest")
+          name = os.environ.get("LUMINA_NAME", "Lumina")
+          ipa_url = f"https://github.com/{repo}/releases/download/{tag}/Lumina-signed.ipa"
+          bundle_id = "${{ github.event.inputs.bundle_id }}" or "app.lumina.installer"
+          manifest = {
+              "items": [{
+                  "assets": [
+                      {"kind": "software-package", "url": ipa_url},
+                  ],
+                  "metadata": {
+                      "bundle-identifier": bundle_id,
+                      "bundle-version": "1.0.0",
+                      "kind": "software",
+                      "title": name,
+                  },
+              }]
+          }
+          pathlib.Path("signed/manifest.plist").write_bytes(plistlib.dumps(manifest))
+          pathlib.Path("signed/checksum.sha256").write_text(f"{sha}  Lumina-signed.ipa\n{size} bytes\n")
+          print(ipa_url, sha, size)
+          PY
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Lumina ${{ env.RELEASE_TAG }}
+          body: Signed by Lumina on GitHub Actions. Install the profile on iPad, then tap Install.
+          files: |
+            signed/Lumina-signed.ipa
+            signed/manifest.plist
+            signed/checksum.sha256
+          fail_on_unmatched_files: true
+
+      - name: Stage Pages payload
+        run: |
+          mkdir -p site
+          cp index.html site/index.html
+          cp profile.mobileconfig site/profile.mobileconfig
+          cp signed/manifest.plist site/manifest.plist
+          cp -r assets site/assets
+          cp apps/catalog.json site/catalog.json
+          python3 - << 'PY'
+          from pathlib import Path
+          import os
+          repo = os.environ["GITHUB_REPOSITORY"]
+          owner, name = repo.split("/")
+          pages = f"https://{owner}.github.io/{name}"
+          tag = os.environ.get("RELEASE_TAG", "latest")
+          ipa = f"https://github.com/{repo}/releases/download/{tag}/Lumina-signed.ipa"
+          html = Path("site/index.html").read_text()
+          html = html.replace("__IPA_URL__", ipa)
+          html = html.replace("__MANIFEST_URL__", f"{pages}/manifest.plist")
+          html = html.replace("__PAGES_URL__", pages)
+          Path("site/index.html").write_text(html)
+          cfg = Path("site/profile.mobileconfig").read_text()
+          Path("site/profile.mobileconfig").write_text(cfg.replace("__PAGES_URL__", pages))
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: sign
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
